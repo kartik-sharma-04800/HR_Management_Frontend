@@ -162,48 +162,37 @@
     }
     
     async function searchJobHistory() {
-        const employeeId = document.getElementById('employeeIdInput').value;
-        
-        if (!employeeId) {
-            alert('Please enter an Employee ID');
-            return;
-        }
-        
-        // Reset all sections and show spinner
-        resetSections();
-        document.getElementById('loadingSpinner').style.display = 'block';
-        
+    const employeeId = document.getElementById('employeeIdInput').value;
+    
+    if (!employeeId) {
+        alert('Please enter an Employee ID');
+        return;
+    }
+    
+    // Reset once at the start only
+    resetSections();
+    document.getElementById('loadingSpinner').style.display = 'block';
+    
+    try {
+        let currentJobResponse = null;
+        let historyResponse = null;
+        let employeeData = null;
+        let employeeNotFound = false;
+
+        // Fetch all data first, before touching the DOM
         try {
-            let currentJobResponse = null;
-            let historyResponse = null;
-            let employeeData = null;
-            let employeeNotFound = false;
-
-            // Fetch employee details first to get the name
-            try {
-                employeeData = await API.get(`/employees/${employeeId}`);
-                if (employeeData && !employeeData.error) {
-                    const fullName = `${employeeData.firstName || ''} ${employeeData.lastName || ''}`.trim();
-                    document.getElementById('pageTitle').textContent = 
-                        `Job History for ${fullName} (ID: ${employeeId})`;
-                    
-                    // Display employee info card
-                    displayEmployeeInfo(employeeData);
-                    document.getElementById('employeeInfoSection').style.display = 'block';
-                }
-            } catch (e) {
-                const msg = (e.message || '').toLowerCase();
-                if (msg.includes('404') || msg.includes('not found')) {
-                    employeeNotFound = true;
-                }
+            employeeData = await API.get(`/employees/${employeeId}`);
+        } catch (e) {
+            const msg = (e.message || '').toLowerCase();
+            if (msg.includes('404') || msg.includes('not found')) {
+                employeeNotFound = true;
             }
+        }
 
-            // Check current job first — 404 here means invalid employee
+        if (!employeeNotFound) {
             try {
                 currentJobResponse = await API.get(`/job-history/current/${employeeId}`);
-                
-                // Check if response contains an error field
-                if (currentJobResponse && currentJobResponse.error) {
+                if (currentJobResponse?.error) {
                     const msg = currentJobResponse.error.toLowerCase();
                     if (msg.includes('404') || msg.includes('not found')) {
                         employeeNotFound = true;
@@ -215,51 +204,56 @@
                     employeeNotFound = true;
                 }
             }
+        }
 
-            // If employee not found, stop here — don't show N/A cards
-            if (employeeNotFound) {
-                resetSections();
-                document.getElementById('pageTitle').textContent = 'Employee Job History - Managed by Kartik';
-                document.getElementById('errorMessage').style.display = 'block';
-                document.getElementById('errorText').textContent =
-                    `Employee ID ${employeeId} not found. Please check the employee ID and try again.`;
-                return;
-            }
-
-            // Only fetch history if employee exists
+        if (!employeeNotFound) {
             try {
                 historyResponse = await API.get(`/job-history/employee/${employeeId}`);
-            } catch (e) {
-                // Ignore history errors if employee exists
-            }
+            } catch (e) { /* ignore */ }
+        }
 
-            resetSections();
+        // ── Now hide spinner and render everything at once ──
+        document.getElementById('loadingSpinner').style.display = 'none';
 
-            // Show current job only if we got valid data
-            if (currentJobResponse) {
-                displayCurrentJob(currentJobResponse);
-                document.getElementById('currentJobSection').style.display = 'block';
-            }
-
-            // Show history only if array has items
-            if (historyResponse && historyResponse.length > 0) {
-                displayJobHistory(historyResponse);
-                document.getElementById('jobHistorySection').style.display = 'block';
-            }
-
-            // If nothing to show, display no data message
-            if (!currentJobResponse && (!historyResponse || historyResponse.length === 0)) {
-                document.getElementById('noDataMessage').style.display = 'block';
-            }
-
-        } catch (error) {
-            console.error('Error loading job history:', error);
-            resetSections();
+        if (employeeNotFound) {
             document.getElementById('pageTitle').textContent = 'Employee Job History - Managed by Kartik';
             document.getElementById('errorMessage').style.display = 'block';
-            document.getElementById('errorText').textContent = 'Failed to load job history: ' + error.message;
+            document.getElementById('errorText').textContent =
+                `Employee ID ${employeeId} not found. Please check the employee ID and try again.`;
+            return;
         }
+
+        if (employeeData && !employeeData.error) {
+            const firstName = employeeData.firstName || '';
+            const lastName = employeeData.lastName || '';
+            const fullName = `${firstName} ${lastName}`.trim() || 'Unknown Employee';
+            document.getElementById('pageTitle').textContent = `Job History for ${fullName} (ID: ${employeeId})`;
+            displayEmployeeInfo(employeeData);
+            document.getElementById('employeeInfoSection').style.display = 'block';
+        }
+
+        if (currentJobResponse && Object.keys(currentJobResponse).length > 0) {
+            displayCurrentJob(currentJobResponse);
+            document.getElementById('currentJobSection').style.display = 'block';
+        }
+
+        if (historyResponse && historyResponse.length > 0) {
+            displayJobHistory(historyResponse);
+            document.getElementById('jobHistorySection').style.display = 'block';
+        }
+
+        if (!currentJobResponse && (!historyResponse || historyResponse.length === 0)) {
+            document.getElementById('noDataMessage').style.display = 'block';
+        }
+
+    } catch (error) {
+        console.error('Error loading job history:', error);
+        document.getElementById('loadingSpinner').style.display = 'none';
+        document.getElementById('pageTitle').textContent = 'Employee Job History - Managed by Kartik';
+        document.getElementById('errorMessage').style.display = 'block';
+        document.getElementById('errorText').textContent = 'Failed to load job history: ' + error.message;
     }
+        }
     
     function formatCurrency(amount) {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount);
