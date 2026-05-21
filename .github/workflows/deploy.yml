@@ -48,16 +48,16 @@ jobs:
             cd /home/${{ secrets.EC2_USERNAME }}/hr_fr || mkdir -p /home/${{ secrets.EC2_USERNAME }}/hr_fr && cd /home/${{ secrets.EC2_USERNAME }}/hr_fr
             
             # Download docker-compose.prod.yml from repository
-            curl -o docker-compose.prod.yml https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/docker-compose.prod.yml
+            sudo curl -o docker-compose.prod.yml https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/docker-compose.prod.yml
             
             # Pull latest image
             sudo docker pull ${{ secrets.DOCKER_USERNAME }}/hr-frontend:latest
             
             # Stop and remove old containers
-            sudo docker-compose -f docker-compose.prod.yml down
+            sudo docker compose -f docker-compose.prod.yml down
             
             # Start new containers
-            sudo docker-compose -f docker-compose.prod.yml up -d
+            sudo docker compose -f docker-compose.prod.yml up -d
             
             # Clean up old images
             sudo docker image prune -af
